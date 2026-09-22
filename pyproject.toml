@@ -1,0 +1,51 @@
+[project]
+name = "mjlsearch"
+version = "0.1.0"
+description = "Hybrid Rust/Python search engine: Rust crawling, indexing and query execution behind a FastAPI gateway."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "psutil>=6.0",
+    # The dashboard is a Flask service that reads the JSON API over HTTP.
+    "flask>=3.1",
+    "httpx>=0.27",
+    "search-core",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "maturin>=1.7,<2",
+    "ruff>=0.8",
+    "playwright>=1.62.0",
+]
+
+# This project is an application, not a distributable library: uv syncs its
+# dependencies without trying to build and install the root project itself.
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["crates/search-core"]
+
+# search-core is built from source by maturin as part of `uv sync`, so the Rust
+# extension and the Python environment can never drift apart.
+[tool.uv.sources]
+search-core = { workspace = true }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

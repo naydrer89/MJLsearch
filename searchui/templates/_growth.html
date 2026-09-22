@@ -1,0 +1,32 @@
+{# The growth strip: one line on every page saying whether the index is still being
+   fed, and how much arrived in the last hour.
+
+   Server-rendered from the same feed the chart reads, so it is correct in the first
+   byte and remains correct with scripts blocked; search.js then keeps it live. The
+   initial values also ride along in data attributes, which is what lets the script
+   tween between the number it finds and the number it is told, instead of animating
+   from zero on every poll. #}
+<div class="growth"
+     id="growth"
+     data-growth-endpoint="{{ url_for('api_growth') }}"
+     data-poll-ms="{{ growth_poll_ms }}"
+     data-total="{{ growth.total_documents }}"
+     data-hour="{{ growth.documents_last_hour }}"
+     data-rate="{{ growth.rate_per_minute }}"
+     data-idle="{{ 'true' if growth.idle else 'false' }}"
+     data-available="{{ 'true' if growth.available else 'false' }}">
+  <span class="growth__pulse{{ '' if growth.available and not growth.idle else ' growth__pulse--idle' }}"
+        aria-hidden="true"></span>
+  <span class="growth__label">Indexed</span>
+  <span class="growth__value mono" data-growth="total">{{ growth.total_documents | count }}</span>
+  <span class="growth__unit">documents</span>
+  <span class="growth__sep" aria-hidden="true">·</span>
+  <span class="growth__value mono" data-growth="hour">{{ growth.documents_last_hour | count }}</span>
+  <span class="growth__unit">in the last hour</span>
+  <span class="growth__sep" aria-hidden="true">·</span>
+  {# The one label that means "work is happening right now", so it is the only one that
+     shimmers. An idle indexer is the expected end of a finished crawl, not a warning. #}
+  <span class="growth__state{{ ' growth__state--live' if growth_live }}"
+        data-growth="state">{{ growth_state }}</span>
+  <a class="growth__link" href="{{ url_for('stats') }}">Growth</a>
+</div>

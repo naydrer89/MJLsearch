@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en" style="color-scheme: light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f9f9f9">
+<meta name="description" content="Search the MJLsearch index.">
+<title>{% if query %}{{ query }} — MJLsearch{% else %}MJLsearch{% endif %}</title>
+{# A monogram rather than the arrow that used to sit in the header: with the mark gone
+   from the page, a tab still needs to be identifiable, and the first letter of the name
+   is the part of it that survives at 16px. #}
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23000'/%3E%3Ctext x='16' y='23' font-family='system-ui,sans-serif' font-size='20' font-weight='600' fill='%23fff' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="{{ url_for('static', filename='search.css') }}">
+</head>
+
+{# One form for both states, repositioned by the body class rather than duplicated:
+   two copies would mean two ids, and whichever one the label pointed at would be
+   the wrong one half the time. #}
+<body class="{{ 'state-results' if query else 'state-landing' }}">
+
+<a class="skip" href="#results">Skip to results</a>
+
+<header class="top">
+  {# The name is the whole brand: no mark, which is also why the wordmark is never
+     folded away at narrow widths -- it is the only thing the link has left. #}
+  <a class="brand" href="{{ url_for('index') }}">
+    <span class="brand__name">MJLsearch</span>
+  </a>
+
+  {# The bar stays a bar: the growth page is reachable from the strip in the footer,
+     which is on every page, rather than by adding a third control to the one row that
+     has to survive a 320px viewport. #}
+  <form class="box" action="{{ url_for('index') }}" method="get" role="search" autocomplete="off">
+    <label class="sr-only" for="q">Search the index</label>
+    {# The field is a wrapper plus a real input, because two things have to happen inside
+       the box: the query dissolves out of it on clear, and a streak ignites under it
+       while it goes. Neither is possible on the input itself, so the wrapper owns the
+       surface and the input stays the only thing the form submits. #}
+    {# `data-overlay` marks the parts this field deliberately stacks on top of itself:
+       the mirror that paints the value, the placeholder that falls in behind it, and
+       the clear button inside the pill. They are siblings of the input and they do
+       overlap it, which is the construction rather than a collision -- the audit is
+       told so here instead of being taught to guess. #}
+    <div class="t-clear{{ ' is-error' if shake }}" data-clear data-overlay>
+      <input id="q" name="q" type="search" value="{{ query }}"
+             placeholder="Search the index…"
+             autocomplete="off" spellcheck="false" autocapitalize="off"
+             enterkeyhint="search"
+             {% if not query %}autofocus{% endif %}
+             aria-describedby="box-hint">
+      <div class="t-clear-mirror" aria-hidden="true"></div>
+      <div class="t-clear-placeholder" aria-hidden="true">Search the index…</div>
+      <div class="t-clear-glow" aria-hidden="true"></div>
+      <button class="t-clear-btn" type="button" aria-label="Clear the query">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M7 7l10 10M17 7L7 17" stroke-width="2" stroke-linecap="round"></path>
+        </svg>
+      </button>
+    </div>
+    <button class="box__go" type="submit">
+      <span class="box__go-label">Search</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <circle cx="11" cy="11" r="6.5" fill="none" stroke-width="2"></circle>
+        <path d="M16 16l4.5 4.5" fill="none" stroke-width="2" stroke-linecap="round"></path>
+      </svg>
+    </button>
+  </form>
+
+  {% if not query %}
+  <p class="box__hint" id="box-hint">Full text of every crawled page, ranked by BM25.</p>
+  {% endif %}
+</header>
+
+<main id="results" class="results" aria-busy="false">
+
+  {% if error %}
+    {# Every failure the visitor can act on, in the interface's own voice. #}
+    <div class="notice" role="alert">
+      {% if invalid_query %}
+        {# A query the engine could not parse is the visitor's own input coming back at
+           them, and search is working: the heading, the advice and the hint all say so,
+           because sending someone to check whether the crawler has run would be the
+           wrong next step. #}
+        <h2 class="notice__title">That query could not be parsed</h2>
+        <p class="notice__body">{{ error }}</p>
+        <p class="notice__hint">
+          A query is a Tantivy query string: quoting a phrase opens and closes it, so an
+          odd number of <code translate="no">"</code> is a syntax error. Try
+          <code translate="no">{{ query | replace('"', '') }}</code> instead, or
+          <a href="{{ url_for('index') }}">start over</a>.
+        </p>
+      {% else %}
+        <h2 class="notice__title">Search is not available</h2>
+        <p class="notice__body">{{ error }}</p>
+        <p class="notice__hint">
+          The index is built by the crawler and the indexer binaries; if neither has run
+          yet, there is simply nothing to search. The API itself is at
+          <code translate="no">{{ backend }}</code>.
+        </p>
+      {% endif %}
+    </div>
+
+  {% elif not query %}
+    <div class="empty">
+      <p class="empty__lead">Search {{ total }} indexed documents.</p>
+      <ul class="chips">
+        <li><span class="chips__label">Try</span></li>
+        {% for suggestion in suggestions %}
+          <li><a class="chip" href="{{ url_for('index', q=suggestion) }}">{{ suggestion }}</a></li>
+        {% endfor %}
+      </ul>
+      <p class="empty__note">
+        Every word has to appear, so extra words narrow the search rather than widen
+        it; use <code translate="no">OR</code> for alternatives,
+        <code translate="no">"exact phrase"</code> in quotes, and
+        <code translate="no">title:borrowing</code> to search one field.
+      </p>
+    </div>
+
+  {% else %}
+    <p class="summary" id="summary" aria-live="polite">
+      {% if total %}
+        {# "about", because this counts what matched in the whole index while paging can
+           only reach the top of the ranked pool. Saying "13 816 results" next to a pager
+           that stops at 40 pages was the page telling two different stories. #}
+        {% if reachable and reachable < total %}<span class="summary__lead">about</span>{% endif %}
+        <span class="summary__count">{{ "{:,}".format(total).replace(",", " ") }}</span>
+        {{ 'result' if total == 1 else 'results' }}
+        <span class="summary__sep">·</span>
+        <span class="mono">{{ '%.2f'|format(took_ms or 0) }} ms</span>
+        {% if cached %}<span class="summary__sep">·</span><span class="tag">from cache</span>{% endif %}
+        {% if relaxed %}
+          {# Requiring every term found nothing, so the search was widened to "any
+             term". Said out loud because these results are not what was asked for. #}
+          <span class="summary__sep">·</span>
+          <span class="summary__note">widened: no page held every word</span>
+        {% endif %}
+        {% if ranking and ranking.suppressed %}
+          <span class="summary__sep">·</span>
+          <span class="summary__note">{{ ranking.suppressed }} duplicate {{ 'page' if ranking.suppressed == 1 else 'pages' }}
+            collapsed</span>
+        {% endif %}
+      {% else %}
+        No results for <strong>{{ query }}</strong>
+      {% endif %}
+    </p>
+
+    {% if results %}
+      <ol class="hits">
+        {% for hit in results %}
+          <li class="hit">
+            <p class="hit__url">{{ hit.breadcrumb }}</p>
+            <h2 class="hit__title"><a href="{{ hit.url }}">{{ hit.title or hit.url }}</a></h2>
+            <p class="hit__snippet">{{ hit.snippet | snippet }}</p>
+            <p class="hit__meta">
+              <span class="mono">score {{ '%.2f'|format(hit.score) }}</span>
+              <span class="summary__sep">·</span>
+              <span>fetched {{ hit.fetched_at | date }}</span>
+            </p>
+          </li>
+        {% endfor %}
+      </ol>
+
+      {% if cap_note %}
+        {# A page shorter than it asked for, where the reason is the per-site cap: every
+           remaining candidate is from a site already on this page. Said out loud because
+           the fix is a raised cap, not a different query. #}
+        <p class="empty__note">
+          Every other candidate for this page is from a site that already has
+          {{ cap_note }} result{{ '' if cap_note == 1 else 's' }} shown here. The cap keeps one
+          site from taking a whole page; raise <code translate="no">SEARCH_MAX_PER_DOMAIN</code>
+          on the API to see more from one site.
+        </p>
+      {% endif %}
+
+      {% if pages > 1 %}
+        {% set window = 2 %}
+        <nav class="pager" aria-label="Result pages">
+          {% if page > 1 %}
+            <a class="pager__step" rel="prev" href="{{ url_for('index', q=query, page=page - 1) }}">Previous</a>
+          {% else %}
+            <span class="pager__step pager__step--off" aria-hidden="true">Previous</span>
+          {% endif %}
+
+          {% for number in range(1, pages + 1) %}
+            {% if number == 1 or number == pages or (number >= page - window and number <= page + window) %}
+              {% if number == page %}
+                <span class="pager__page pager__page--current" aria-current="page">{{ number }}</span>
+              {% else %}
+                <a class="pager__page" href="{{ url_for('index', q=query, page=number) }}">{{ number }}</a>
+              {% endif %}
+            {% elif number == page - window - 1 or number == page + window + 1 %}
+              <span class="pager__gap" aria-hidden="true">…</span>
+            {% endif %}
+          {% endfor %}
+
+          {% if page < pages %}
+            <a class="pager__step" rel="next" href="{{ url_for('index', q=query, page=page + 1) }}">Next</a>
+          {% else %}
+            <span class="pager__step pager__step--off" aria-hidden="true">Next</span>
+          {% endif %}
+        </nav>
+      {% endif %}
+
+    {% elif past_the_pool %}
+      {# Reached by a hand-typed page number past what the pool can reach. Distinct
+         from "nothing matched", because thousands of documents did. #}
+      <div class="empty">
+        <p class="empty__lead">No such page.</p>
+        <p class="empty__note">
+          Ranking works on the top {{ "{:,}".format(reachable).replace(",", " ") }} candidates, so
+          paging stops before this one even though the index holds more matches.
+          <a href="{{ url_for('index', q=query) }}">Back to the first page</a>.
+        </p>
+      </div>
+
+    {% else %}
+      <div class="empty">
+        <p class="empty__lead">No document in the index matches that.</p>
+        <p class="empty__note">
+          Matching is exact after stemming, so a misspelling finds nothing. Try fewer
+          or broader words, or one of these:
+        </p>
+        <ul class="chips">
+          {% for suggestion in suggestions %}
+            <li><a class="chip" href="{{ url_for('index', q=suggestion) }}">{{ suggestion }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  {% endif %}
+
+</main>
+
+<footer class="foot">
+  <div class="foot__row">
+    {# `min` because a hand-typed page past the pool is reported by the body, and the
+       footer should not then claim to be showing page 99 of 40. #}
+    <span>{{ 'Showing page %d of %d'|format([page, pages]|min, pages) if pages > 1 else 'MJLsearch' }}</span>
+    <span class="mono">{{ backend }}</span>
+  </div>
+  {# Always on the page, in both states: "is this still indexing?" is a question a
+     visitor asks on the landing page as readily as on a results page. #}
+  {% include "_growth.html" %}
+</footer>
+
+{# motion.js first: search.js calls into it, and both are deferred, so they run in the
+   order they appear. #}
+<script src="{{ url_for('static', filename='motion.js') }}" defer></script>
+<script src="{{ url_for('static', filename='search.js') }}" defer></script>
+</body>
+</html>

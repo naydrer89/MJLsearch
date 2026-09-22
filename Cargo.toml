@@ -1,0 +1,109 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/common",
+    "crates/crawler",
+    "crates/indexer",
+    "crates/search-core",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+
+# Versions are declared here once so they cannot drift between crates. A crate
+# only pays for what it actually references: entries listed here that a given
+# crate does not depend on are never built into it.
+[workspace.dependencies]
+# --- internal ---
+common = { path = "crates/common" }
+
+# --- async runtime ---
+tokio = { version = "1.53", features = [
+    "rt-multi-thread",
+    "macros",
+    "net",
+    "time",
+    "sync",
+    "signal",
+    "fs",
+    "io-util",
+] }
+
+# --- http ---
+# rustls rather than native-tls on purpose: it keeps OpenSSL out of the crawler
+# binary and out of the API process, which matters for both image size and the
+# resident-memory budget.
+#
+# Note the feature names. reqwest 0.13 renamed `rustls-tls` to `rustls` and its
+# API has moved on from the versions most examples were written against.
+# `rustls-native-certs` keeps the OS trust store authoritative, which is what a
+# crawler in a corporate network needs; only the crawler links this at all, and
+# its image installs ca-certificates.
+reqwest = { version = "0.13", default-features = false, features = [
+    "rustls",
+    "rustls-native-certs",
+    "http2",
+    "gzip",
+    "brotli",
+    "charset",
+] }
+
+# --- parsing / extraction ---
+# Streaming rewriter: never materialises a full DOM.
+lol_html = "3.0"
+
+# Sitemaps are conventionally served as a literal `.gz` file, which carries no
+# `Content-Encoding` header for the HTTP client to act on, so the crawler has to
+# expand them itself. Both versions here are the ones reqwest already resolves,
+# so this adds no compilation the build was not already paying for.
+flate2 = "1.1"
+
+# Decoding a body with the charset the response declares. A large minority of
+# real sites still serve latin-1, and indexing those as UTF-8 replaces every
+# accented character with U+FFFD.
+encoding_rs = "0.8"
+
+# --- persistence ---
+# default-features = false: the bundled RocksDB is compiled from source, so
+# every codec we do not use is pure compile time and binary bloat.
+rocksdb = { version = "0.25", default-features = false, features = ["lz4"] }
+zstd = "0.14"
+
+# --- index ---
+tantivy = "0.26"
+
+# --- dedup + hashing ---
+# serde support is unconditional in this crate; the only feature it exposes is
+# `nightly`, which we do not need.
+growable-bloom-filter = "2.1"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+# --- python bridge ---
+# No features here: the abi3 feature is selected by search-core's own
+# `python` / `abi3-py312` features so that a plain `cargo test` never links
+# libpython, and maturin turns the bindings on only for wheel builds.
+pyo3 = { version = "0.29" }
+
+# --- cli / logging / errors / misc ---
+# `env` lets every path be set from the environment as well as from a flag, so a
+# container needs no command-line arguments.
+clap = { version = "4.6", features = ["derive", "env"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+thiserror = "2"
+url = "2"
+serde = { version = "1", features = ["derive"] }
+moka = { version = "0.12", features = ["sync"] }
+postcard = { version = "1.1", features = ["alloc"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+# Deliberately unwind, not abort: search-core is a cdylib loaded into a Python
+# interpreter, and a panic that aborts would take the host process with it.
+panic = "unwind"

@@ -1,0 +1,35 @@
+[package]
+name = "search-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Tantivy-backed index and query engine, exposed to Python through PyO3."
+
+[lib]
+name = "search_core"
+# `rlib` is required so `cargo test` can link this crate: a cdylib-only crate
+# cannot be unit-tested. `cdylib` is what maturin turns into search_core.so.
+# The indexer also links the rlib directly, so there is exactly one
+# implementation of the index writer rather than a copy per binary.
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+# The bindings are opt-in. `cargo test -p search-core` therefore never links
+# libpython, which matters on a machine whose only system interpreter is newer
+# than the ones PyO3 can build against. maturin enables these for wheel builds.
+python = ["dep:pyo3"]
+extension-module = ["python", "pyo3/extension-module"]
+abi3-py312 = ["python", "pyo3/abi3-py312"]
+
+[dependencies]
+common = { workspace = true }
+tantivy = { workspace = true }
+moka = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+pyo3 = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3"

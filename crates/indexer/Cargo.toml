@@ -1,0 +1,37 @@
+[package]
+name = "indexer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Drains crawled documents into the Tantivy index. The sole writer of the index."
+
+[lib]
+name = "indexer"
+path = "src/lib.rs"
+
+[[bin]]
+name = "indexer"
+path = "src/main.rs"
+
+# Deliberately no tokio. Tantivy's IndexWriter is synchronous, the drain loop is
+# bound by local disk rather than by network, and an async runtime here would be
+# pure overhead.
+# No RocksDB, and no HTTP client. The hand-off from the crawler is a spool
+# directory of files, so this binary touches nothing but the spool and the index.
+# That is the dependency-graph payoff of decoupling the two: the indexer never
+# links the crawler's networking stack, and the crawler never links Tantivy.
+[dependencies]
+common = { workspace = true }
+search-core = { path = "../search-core" }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+thiserror = { workspace = true }
+# Both are needed for real now: the link-graph sidecar and the growth timeline are
+# small JSON files rather than a third database.
+serde = { workspace = true }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"

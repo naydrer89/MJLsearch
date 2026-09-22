@@ -1,0 +1,68 @@
+# syntax=docker/dockerfile:1
+#
+# Builds the API image.
+#
+# The Rust extension is built here rather than copied in from a published wheel,
+# so the image can never ship an extension that disagrees with the Python code in
+# the same commit. The wheel is abi3, which is what makes it valid to build it in
+# one stage and install it on the python:3.12 base in the next.
+
+FROM rust:1.96-slim AS extension
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        clang \
+        libclang-dev \
+        pkg-config \
+        python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv /venv && /venv/bin/pip install --no-cache-dir --upgrade pip maturin
+
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+
+# --release matters: a debug extension is fast to build and slow to run, which is
+# the wrong trade for an image whose whole purpose is latency.
+RUN /venv/bin/maturin build \
+        --release \
+        --manifest-path crates/search-core/Cargo.toml \
+        --out /wheels
+
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+COPY pyproject.toml README.md ./
+COPY api ./api
+# The Flask dashboard ships in this image too, so the viewer always matches the
+# API contract in the same commit.
+COPY dashboard ./dashboard
+COPY --from=extension /wheels /wheels
+
+RUN pip install --no-cache-dir /wheels/*.whl \
+    && pip install --no-cache-dir \
+        "fastapi>=0.115" \
+        "uvicorn[standard]>=0.32" \
+        "pydantic>=2.9" \
+        "pydantic-settings>=2.6" \
+        "psutil>=6.0" \
+        "flask>=3.1" \
+        "httpx>=0.27" \
+    && rm -rf /wheels
+
+# The API never writes the index, so compose mounts /data read-only. Declaring it
+# here documents the intent even though Docker cannot enforce read-only itself.
+VOLUME ["/data"]
+
+EXPOSE 8000 5000
+
+# Workers must spawn, not fork a parent that has already opened the index.
+# The dashboard service overrides this command; see docker-compose.yml.
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

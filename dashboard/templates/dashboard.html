@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" style="color-scheme: light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f9f9f9">
+<meta name="description" content="Live index, crawler and query analytics for MJLsearch.">
+<title>MJLsearch — Index Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Inter:wght@400;500&display=swap">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23000'/%3E%3Ctext x='16' y='23' font-family='system-ui,sans-serif' font-size='20' font-weight='600' fill='%23fff' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body data-poll-ms="{{ poll_ms }}" data-backend="{{ backend }}">
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="bar">
+  <div class="bar__mark">
+    <h1 class="wordmark">MJLsearch <span class="wordmark__sub">Index Console</span></h1>
+  </div>
+
+  <form class="search" id="search-form" role="search" autocomplete="off">
+    <label class="sr-only" for="q">Search the index</label>
+    <input id="q" name="q" type="search" placeholder="Search the index…"
+           autocomplete="off" spellcheck="false" autocapitalize="off"
+           aria-describedby="search-note">
+    <button class="btn btn--primary" type="submit" id="search-submit">Search</button>
+  </form>
+
+  <div class="bar__actions">
+    <label class="switch" for="sound-toggle">
+      <input type="checkbox" id="sound-toggle" name="sound">
+      <span class="switch__track" aria-hidden="true"><span class="switch__thumb"></span></span>
+      <span class="switch__label">Sound</span>
+    </label>
+    <button class="btn btn--ghost" type="button" id="pause-button" aria-pressed="false">Pause</button>
+    <button class="btn btn--ghost" type="button" id="reset-button">Reset log</button>
+  </div>
+</header>
+
+<div class="notice" id="notice" role="status" aria-live="polite" hidden></div>
+
+<main id="main">
+
+  <section class="lede" aria-labelledby="lede-heading">
+    <div class="lede__figure">
+      <h2 class="lede__label" id="lede-heading">Documents indexed</h2>
+      <p class="lede__value" id="lede-docs" data-count-to="0">0</p>
+      <p class="lede__meta" id="lede-meta">Reading the index…</p>
+    </div>
+
+    <figure class="lede__chart">
+      <figcaption class="lede__label">
+        Query throughput <span class="mono" id="series-window">last 5 minutes · 10s buckets</span>
+      </figcaption>
+      <canvas id="series" height="120" role="img"
+              aria-label="Queries served per ten second bucket over the last five minutes"></canvas>
+      <p class="lede__legend" id="series-legend">No queries recorded in this window.</p>
+    </figure>
+  </section>
+
+  <section class="cards" aria-label="Summary">
+    <article class="card reveal">
+      <h3 class="card__label">Index</h3>
+      <p class="card__value" id="m-docs" data-count-to="0">—</p>
+      <p class="card__meta" id="m-index-bytes">—</p>
+      <p class="card__meta" id="m-revision">—</p>
+    </article>
+
+    <article class="card reveal">
+      <h3 class="card__label">Queries served</h3>
+      <p class="card__value" id="m-queries" data-count-to="0">—</p>
+      <p class="card__meta" id="m-qps">—</p>
+      <p class="card__meta" id="m-cache">—</p>
+    </article>
+
+    <article class="card reveal">
+      <h3 class="card__label">Latency</h3>
+      <p class="card__value" id="m-p50">—</p>
+      <p class="card__meta" id="m-p95">—</p>
+      <p class="card__meta" id="m-worst">—</p>
+    </article>
+
+    <article class="card reveal">
+      <h3 class="card__label">Crawler</h3>
+      <p class="card__value" id="m-indexed" data-count-to="0">—</p>
+      <p class="card__meta" id="m-crawl">—</p>
+      <p class="card__meta" id="m-crawl-age">—</p>
+    </article>
+
+    <article class="card reveal">
+      <h3 class="card__label">Indexer backlog</h3>
+      <p class="card__value" id="m-sealed" data-count-to="0">—</p>
+      <p class="card__meta" id="m-sealed-bytes">—</p>
+      <p class="card__meta" id="m-open">—</p>
+    </article>
+
+    <article class="card reveal">
+      <h3 class="card__label">API process</h3>
+      <p class="card__value" id="m-rss">—</p>
+      <p class="card__meta" id="m-cpu">—</p>
+      <p class="card__meta" id="m-uptime">—</p>
+    </article>
+  </section>
+
+  <section class="results" id="results-panel" aria-labelledby="results-heading">
+    <div class="section__head">
+      <h2 class="section__title" id="results-heading">Search results</h2>
+      <p class="section__note" id="results-note" aria-live="polite">
+        Type a query above to run it against the live index.
+      </p>
+    </div>
+    <div id="results" aria-busy="false"></div>
+  </section>
+
+  <section class="panels">
+    <article class="panel">
+      <div class="section__head">
+        <h2 class="section__title">Most requested</h2>
+      </div>
+      <table>
+        <caption class="sr-only">Queries served most often since this API process started</caption>
+        <thead>
+          <tr><th scope="col">Query</th><th scope="col" class="num">Count</th></tr>
+        </thead>
+        <tbody id="table-top"></tbody>
+      </table>
+    </article>
+
+    <article class="panel">
+      <div class="section__head">
+        <h2 class="section__title">Slowest retained</h2>
+      </div>
+      <table>
+        <caption class="sr-only">Slowest queries still held in this process's query log</caption>
+        <thead>
+          <tr>
+            <th scope="col">Query</th>
+            <th scope="col" class="num">ms</th>
+            <th scope="col" class="num">Matches</th>
+          </tr>
+        </thead>
+        <tbody id="table-slowest"></tbody>
+      </table>
+    </article>
+
+    <article class="panel panel--wide">
+      <div class="section__head">
+        <h2 class="section__title">Recent queries</h2>
+        <p class="section__note" id="recent-note"></p>
+      </div>
+      <table>
+        <caption class="sr-only">The most recent queries, newest first</caption>
+        <thead>
+          <tr>
+            <th scope="col">When</th>
+            <th scope="col">Query</th>
+            <th scope="col" class="num">ms</th>
+            <th scope="col" class="num">Matches</th>
+            <th scope="col" class="num">Shown</th>
+            <th scope="col">Cache</th>
+          </tr>
+        </thead>
+        <tbody id="table-recent"></tbody>
+      </table>
+    </article>
+  </section>
+
+  <p class="tailnote" id="search-note">
+    A query is a Tantivy query string, so <code translate="no">title:borrowing</code>
+    and <code translate="no">rust AND engine</code> both work. Results are BM25-ranked,
+    then adjusted for freshness and capped per site.
+  </p>
+</main>
+
+<footer class="foot">
+  <span id="foot-left">Polling the API every {{ poll_seconds }}s…</span>
+  <span class="mono" id="foot-right">{{ backend }}</span>
+</footer>
+
+<script src="{{ url_for('static', filename='dashboard.js') }}" defer></script>
+</body>
+</html>

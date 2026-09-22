@@ -1,0 +1,39 @@
+# Template: filled in by deploy/setup-server.sh.
+#
+# This is the public surface. Unlike the API and the console it binds every interface
+# by default, and that is a deliberate difference rather than an oversight: the API has
+# no authentication and the console exposes crawler internals, so both stay on loopback
+# while the page a visitor uses does not.
+[Unit]
+Description=MJLsearch search page (the public interface)
+Documentation=file:@APPDIR@/.freebuff/run.md
+After=network-online.target mjlsearch-api.service
+Wants=network-online.target mjlsearch-api.service
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+Group=@SERVICE_GROUP@
+WorkingDirectory=@APPDIR@
+EnvironmentFile=-/etc/default/mjlsearch
+
+# Set after the environment file, so this one wins for this unit only.
+Environment=SEARCH_HOST=0.0.0.0
+Environment=PATH=@SERVICE_HOME@/.local/bin:@APPDIR@/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=@SERVICE_HOME@
+
+ExecStart=@APPDIR@/scripts/run_searchui.sh
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+
+NoNewPrivileges=yes
+ProtectSystem=full
+ReadWritePaths=@APPDIR@
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

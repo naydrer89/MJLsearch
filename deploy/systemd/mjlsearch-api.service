@@ -1,0 +1,48 @@
+# Template: @APPDIR@, @SERVICE_USER@, @SERVICE_GROUP@ and @SERVICE_HOME@ are filled in by
+# deploy/setup-server.sh. Do not install this file by hand -- the placeholders would end
+# up literal in /etc/systemd/system.
+#
+# The API owns the index and answers queries; the two pages are only viewers of it, so
+# everything else depends on this unit rather than on the crawler.
+[Unit]
+Description=MJLsearch query API (Tantivy index behind FastAPI)
+Documentation=file:@APPDIR@/.freebuff/run.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+Group=@SERVICE_GROUP@
+WorkingDirectory=@APPDIR@
+EnvironmentFile=-/etc/default/mjlsearch
+
+# A unit gets no login shell, so PATH is spelled out: both `uv` and the venv live
+# outside /usr/bin, and run_api.sh goes through uv. Without this the service starts,
+# cannot find uv, and reports "no such file or directory" for a script that exists.
+Environment=PATH=@SERVICE_HOME@/.local/bin:@APPDIR@/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Explicit rather than inherited: uv keeps its cache and rustup its toolchain under
+# HOME, and a service whose HOME is wrong is one that re-downloads them.
+Environment=HOME=@SERVICE_HOME@
+
+ExecStart=@APPDIR@/scripts/run_api.sh
+
+# SIGINT rather than SIGTERM: uvicorn treats it as the shutdown it already knows how to
+# do gracefully, which matters because the index is memory-mapped and the workers are
+# mid-request for a share of every second.
+KillSignal=SIGINT
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=3
+
+# The service writes under data/ and logs/ and nowhere else.
+NoNewPrivileges=yes
+ProtectSystem=full
+ReadWritePaths=@APPDIR@
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

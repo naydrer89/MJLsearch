@@ -1,0 +1,26 @@
+# --- Rust ---
+/target
+**/*.rs.bk
+
+# --- Python ---
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Extension modules built by maturin (they live next to the crate source).
+*.so
+*.pyd
+
+# --- Data: index, WARC, RocksDB, bloom filter. Never committed. ---
+/data/
+
+# --- Local config / secrets ---
+.env
+
+# --- Editor / OS ---
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,52 @@
+# syntax=docker/dockerfile:1
+#
+# Builds the two Rust binaries.
+#
+# Both live in one image on purpose. The crawler and the indexer share their most
+# expensive dependency by far -- RocksDB, which is compiled from C++ source -- so
+# a second image for the indexer would double build time to produce a near
+# identical layer. Compose runs the indexer from this same image with a
+# different entrypoint.
+#
+# The final stage is debian-slim rather than scratch. `scratch` is not reachable
+# here: RocksDB and Tantivy are C/C++ dependencies linked against libstdc++ and
+# libc, so the binary is not statically self-contained.
+
+FROM rust:1.96-slim AS build
+
+# librocksdb-sys needs a C++ toolchain, cmake, and libclang for bindgen.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        clang \
+        libclang-dev \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+# Manifests first so that a source-only change does not invalidate the dependency
+# build layer. RocksDB alone takes minutes.
+COPY Cargo.toml Cargo.lock ./
+COPY crates ./crates
+
+RUN cargo build --release --bin crawler --bin indexer
+
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --create-home --uid 10001 crawler
+
+COPY --from=build /src/target/release/crawler /usr/local/bin/crawler
+COPY --from=build /src/target/release/indexer /usr/local/bin/indexer
+
+# Both binaries read and write state here; compose mounts the shared volume.
+VOLUME ["/data"]
+WORKDIR /data
+
+USER crawler
+
+ENTRYPOINT ["/usr/local/bin/crawler"]

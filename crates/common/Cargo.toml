@@ -1,0 +1,24 @@
+[package]
+name = "common"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Document model shared by the crawler, the indexer and the search core."
+
+# Deliberately dependency-light: search-core links this crate, and search-core in
+# turn is loaded into the Python interpreter. Anything added here is paid for by
+# the API process, so this crate stays pure data with no I/O.
+[dependencies]
+serde = { workspace = true }
+xxhash-rust = { workspace = true }
+# Compact binary codec for the queue values. Pure Rust, no C toolchain, and a
+# fraction of what JSON costs on a multi-kilobyte page body. It is safe to keep
+# here even though search-core links this crate: unlike RocksDB, a codec costs
+# the Python process almost nothing (and search-core links Tantivy regardless).
+postcard = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+serde_json = "1"
+tempfile = "3"

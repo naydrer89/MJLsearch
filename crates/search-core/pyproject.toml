@@ -1,0 +1,32 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "search-core"
+# Version lives in Cargo.toml only; duplicating it here would let the two drift.
+dynamic = ["version"]
+description = "Rust query engine for MJLsearch, exposed to Python via PyO3."
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+[tool.maturin]
+module-name = "search_core"
+# extension-module: build for embedding in Python rather than linking libpython.
+# abi3-py312: one wheel that loads on CPython 3.12 and every later version, which
+# is what lets the same artifact run on the dev interpreter and inside the
+# python:3.12-slim API image.
+features = ["extension-module", "abi3-py312"]
+# The Cargo profile is configured here rather than passed as a flag, because the
+# flag route is a trap: MATURIN_PEP517_ARGS="--release" is rejected by maturin's
+# pep517 subcommand, and the silent consequence is a debug extension in every
+# build -- correct, but several times slower than the code it replaces. Set here,
+# it holds for `uv sync`, for a manual `maturin build`, and for CI, with nothing
+# to remember.
+profile = "release"

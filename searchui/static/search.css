@@ -1,0 +1,885 @@
+/* The search page: one form, two states.
+ *
+ * The landing state centres the same markup the results state runs along the top,
+ * which is why `.state-landing` and `.state-results` on <body> carry almost all of
+ * the difference. Duplicating the form instead would have meant two inputs with the
+ * same id, and a label pointing at whichever one the browser found first.
+ *
+ * Palette and tokens are the same ones the dashboard uses, so the two surfaces read
+ * as one product: strictly achromatic, hierarchy from contrast, scale and weight.
+ */
+
+:root {
+  --surface: #f9f9f9;
+  --surface-lowest: #ffffff;
+  --surface-low: #f3f3f3;
+  --surface-container: #eeeeee;
+  --surface-high: #e8e8e8;
+  --surface-variant: #e2e2e2;
+
+  --on-surface: #1b1b1b;
+  --on-surface-variant: #4c4546;
+  --primary: #000000;
+  --on-primary: #ffffff;
+  --secondary: #5e5e63;
+  --muted: #999999;
+
+  --outline-variant: #e5e5e5;
+  --outline: #7e7576;
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+
+  --radius-sm: 0.25rem;
+  --radius: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+
+  --u1: 0.25rem;
+  --u2: 0.5rem;
+  --u4: 1rem;
+  --u6: 1.5rem;
+  --u8: 2rem;
+  --u12: 3rem;
+  --u16: 4rem;
+  --margin: 1.5rem;
+
+  --label-size: 0.75rem;
+
+  --display: "Geist", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --shadow-ambient: 0 12px 40px rgba(0, 0, 0, 0.05);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: var(--body);
+  font-size: 1rem;
+  line-height: 1.6;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+.mono, code { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+.skip {
+  position: absolute; left: var(--u4); top: -100px;
+  z-index: 20; display: inline-flex; align-items: center; min-height: 44px;
+  padding: var(--u2) var(--u4);
+  background: var(--primary); color: var(--on-primary);
+  border-radius: var(--radius); text-decoration: none;
+  transition: top 150ms ease;
+}
+.skip:focus { top: var(--u4); }
+
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- the bar, in both of its shapes ---------- */
+
+.top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--u4);
+  padding: var(--u4) var(--margin);
+}
+
+.state-landing .top {
+  /* Centred, and given the room to be the whole page: on a search page the box is
+   * the product, so it is not tucked under a header that has nothing else in it. */
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: var(--u6);
+  padding-bottom: var(--u16);
+  text-align: center;
+}
+
+.state-results .top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--u4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--outline-variant);
+  transition: box-shadow 200ms ease;
+}
+
+/* Only once the page has scrolled, so the bar does not look lifted while it has
+ * nothing to be lifted above. */
+body.is-scrolled .top { box-shadow: var(--shadow-ambient); }
+
+.brand {
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--on-surface); text-decoration: none;
+  /* The wordmark is the entire link now -- there is no mark that could survive at a
+   * narrow width when the name folds away -- so the name itself has to reach the
+   * 44px touch floor. */
+  min-height: 44px;
+  padding: 0 var(--u1);
+}
+.brand__name {
+  font-family: var(--display); font-size: 1.25rem; font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* On the landing page the name stands alone above the field and is the whole
+ * identity, so it is set at display size. Clamped rather than media-queried: a fixed
+ * 56px mark on a fixed breakpoint is exactly how the mark ended up oversized on a
+ * 320px screen. */
+.state-landing .brand__name {
+  font-size: clamp(1.75rem, 7vw, 3rem);
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+/* ---------- the box ---------- */
+
+.box { display: flex; gap: var(--u2); width: 100%; }
+
+.state-landing .box { width: min(620px, 100%); }
+/* A flex basis of 320px was a minimum, not a starting point: on a 320px phone the
+ * box plus the button and the brand could not fit, and the whole page scrolled
+ * sideways rather than the box giving way. So the box may shrink (`min-width: 0`)
+ * and the width it wants is expressed as a maximum instead. */
+.state-results .box { flex: 1 1 auto; min-width: 0; max-width: 640px; }
+
+/* The field's surface lives on the wrapper rather than on the input, because the clear
+ * transition draws a streak inside the field and that streak has to be clipped by the
+ * rounded box. The input inside is transparent and borderless; the wrapper owns the
+ * border, the radius and the focus state. */
+.t-clear {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  overflow: hidden;
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-full);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.state-landing .t-clear { min-height: 52px; }
+.state-results .t-clear { min-height: 44px; }
+.t-clear:hover { border-color: var(--outline); }
+.t-clear:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+}
+
+.t-clear input {
+  flex: 1;
+  /* The field's own text box is the thing a finger lands on, so it carries the 44px
+   * floor itself. It was the wrapper that did, through a 44px min-height and a 1px
+   * border, which left the input 42px tall -- two pixels under the floor, on the one
+   * control this page is entirely about. */
+  min-height: 44px;
+  min-width: 0;
+  padding: 0 var(--u12) 0 var(--u4);
+  font: inherit;
+  color: var(--on-surface);
+  background: transparent;
+  border: 0;
+  border-radius: inherit;
+  outline: none;
+}
+.t-clear input::placeholder { color: var(--muted); }
+/* The field has a clear button of its own; a browser-drawn second one would sit beside
+ * it and mean the same thing, without the dissolve. */
+.t-clear input::-webkit-search-cancel-button { display: none; -webkit-appearance: none; }
+
+/* The clear affordance only exists once there is something to clear, and it arrives
+ * rather than appearing: the icon-swap motion, applied to a single icon. */
+.t-clear-btn {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-50%) scale(0.25);
+  filter: blur(var(--icon-swap-blur));
+  pointer-events: none;
+  transition:
+    opacity   var(--icon-swap-dur) var(--icon-swap-ease),
+    filter    var(--icon-swap-dur) var(--icon-swap-ease),
+    transform var(--icon-swap-dur) var(--icon-swap-ease),
+    color 150ms ease;
+}
+.t-clear.has-value .t-clear-btn {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+  filter: blur(0);
+  pointer-events: auto;
+}
+@media (hover: hover) {
+  .t-clear-btn:hover { color: var(--on-surface); background: var(--surface-low); }
+}
+.t-clear-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; }
+
+.box__go {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--u2);
+  min-width: 52px; min-height: 52px;
+  padding: 0 var(--u4);
+  font-family: var(--display); font-size: 0.875rem; font-weight: 500;
+  color: var(--on-primary); background: var(--primary);
+  border: 1px solid var(--primary); border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.state-results .box__go { min-height: 44px; }
+.box__go:hover { background: #2b2b2b; border-color: #2b2b2b; }
+.box__go svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
+
+/* On a phone the icon carries the button and the label would only crowd the box. */
+@media (max-width: 640px) {
+  .box__go { min-width: 44px; padding: 0; }
+  .box__go-label { display: none; }
+}
+
+.box__hint {
+  margin: 0; font-size: 0.875rem; color: var(--secondary);
+}
+
+/* ---------- results ---------- */
+
+.results {
+  flex: 1;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: var(--u6) var(--margin) var(--u16);
+}
+.state-landing .results { max-width: 40rem; padding-top: 0; }
+
+.summary {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--u2);
+  margin: 0 0 var(--u8);
+  font-size: 0.875rem; color: var(--secondary);
+}
+.summary__count { font-family: var(--display); font-weight: 600; color: var(--on-surface); }
+/* The separator carried meaning at 1.23:1, which is invisible on this background.
+ * A decorative dot may be exempt from a contrast minimum; a dot standing in for the
+ * word "and" is not, so it is drawn in a colour that can actually be read. */
+.summary__sep { color: var(--secondary); }
+.summary__note { color: var(--secondary); }
+/* "about 13 816 results" -- the qualifier is set apart from the number it qualifies,
+ * and lighter, so the sentence reads as the number first. */
+.summary__lead { color: var(--secondary); }
+
+.tag {
+  display: inline-block; padding: 0 var(--u2);
+  font-family: var(--display); font-size: var(--label-size); font-weight: 500;
+  letter-spacing: 0.04em; line-height: 1.5;
+  border: 1px solid var(--outline); border-radius: var(--radius-full);
+  background: var(--surface-low); color: var(--on-surface-variant);
+  white-space: nowrap;
+}
+
+.hits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--u8); }
+
+.hit { animation: rise 220ms ease-out both; }
+.hit:nth-child(2) { animation-delay: 30ms; }
+.hit:nth-child(3) { animation-delay: 60ms; }
+.hit:nth-child(4) { animation-delay: 90ms; }
+.hit:nth-child(5) { animation-delay: 120ms; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.hit__url {
+  margin: 0;
+  font-family: var(--mono); font-size: 0.8125rem; color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+
+/* The title is the tap target, so its box is padded to the 44px floor while the
+ * text keeps its own line height. */
+.hit__title { font-size: 1.125rem; line-height: 1.35; }
+.hit__title a {
+  display: inline-flex; align-items: center; min-height: 44px;
+  color: var(--primary); text-decoration: none; letter-spacing: -0.01em;
+  transition: color 150ms ease;
+}
+@media (hover: hover) {
+  .hit__title a:hover { text-decoration: underline; text-underline-offset: 3px; }
+}
+
+.hit__snippet {
+  margin: 0; max-width: 68ch;
+  color: var(--on-surface-variant);
+}
+.hit__snippet b {
+  font-weight: 600; color: var(--on-surface);
+  background: var(--surface-high); border-radius: var(--radius-sm);
+}
+
+.hit__meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--u2);
+  margin: var(--u2) 0 0;
+  font-size: 0.8125rem; color: var(--secondary);
+}
+
+/* ---------- empty, error, chips ---------- */
+
+.empty { padding: var(--u8) 0; }
+.empty__lead { margin: 0 0 var(--u4); font-size: 1.125rem; }
+.empty__note { margin: var(--u4) 0 0; max-width: 60ch; color: var(--secondary); font-size: 0.875rem; }
+
+.chips { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--u2); margin: 0; padding: 0; }
+.chips__label {
+  font-family: var(--display); font-size: var(--label-size); font-weight: 500;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--secondary);
+}
+.chip {
+  display: inline-flex; align-items: center; min-height: 44px;
+  padding: 0 var(--u4);
+  font-size: 0.875rem; color: var(--on-surface); text-decoration: none;
+  background: var(--surface-low); border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-full);
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+@media (hover: hover) {
+  .chip:hover { background: var(--surface-container); border-color: var(--outline); }
+}
+
+.notice {
+  margin: var(--u8) 0;
+  padding: var(--u6);
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-left: 3px solid var(--error);
+  border-radius: var(--radius-md);
+}
+.notice__title { font-size: 1.125rem; }
+.notice__body { margin: var(--u2) 0 0; color: var(--on-error-container); }
+.notice__hint { margin: var(--u4) 0 0; font-size: 0.875rem; color: var(--secondary); }
+.notice code { background: var(--surface-container); padding: 0 var(--u1); border-radius: var(--radius-sm); }
+
+/* ---------- paging ---------- */
+
+.pager {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: var(--u2);
+  margin-top: var(--u12); padding-top: var(--u6);
+  border-top: 1px solid var(--outline-variant);
+}
+.pager__page, .pager__step {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px; min-height: 44px; padding: 0 var(--u2);
+  font-family: var(--display); font-size: 0.875rem; font-weight: 500;
+  color: var(--on-surface); text-decoration: none;
+  border: 1px solid transparent; border-radius: var(--radius);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+@media (hover: hover) {
+  .pager a.pager__page:hover, .pager__step:hover { background: var(--surface-high); border-color: var(--outline-variant); }
+}
+.pager__page--current { background: var(--primary); color: var(--on-primary); }
+.pager__step { padding: 0 var(--u4); }
+/* An unavailable step is not drawn at all, rather than drawn faintly. It has to keep
+ * its box -- the pager should not reshuffle when a page opens with a link where the
+ * previous one had a label -- but painting the word "Previous" at 1.23:1 contrast
+ * against the surface, which is what this did, reads as a control that is broken
+ * rather than absent. Nothing is lost: a first page has nowhere to go back to, and the
+ * placeholder stays `aria-hidden`. */
+.pager__step--off { visibility: hidden; }
+.pager__gap { color: var(--secondary); padding: 0 var(--u1); }
+
+/* ---------- footer ---------- */
+
+.foot {
+  display: flex; flex-direction: column; gap: var(--u4);
+  padding: var(--u6) var(--margin);
+  border-top: 1px solid var(--outline-variant);
+  background: var(--surface-low);
+  font-size: 0.75rem; color: var(--secondary);
+}
+.foot__row {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--u2);
+}
+.foot .mono { overflow-wrap: anywhere; }
+
+/* ---------- the growth strip ----------
+ *
+ * On every page, in the footer, so "how much is being indexed" is answered without
+ * navigating anywhere. Laid out as a wrapping row rather than a sentence so that on a
+ * phone it breaks between facts instead of mid-number.
+ */
+
+.growth {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--u2);
+  width: 100%; max-width: 1080px; margin: 0 auto;
+  padding: var(--u2) var(--u4);
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-full);
+  font-size: 0.8125rem; color: var(--secondary);
+}
+
+.growth__pulse {
+  align-self: center;
+  width: 8px; height: 8px; flex: none;
+  background: var(--primary); border-radius: var(--radius-full);
+  animation: pulse 1.8s ease-in-out infinite;
+}
+/* A stopped index is the expected end of a finished crawl, not an alarm, so it reads
+ * as an empty dot rather than as anything coloured. */
+.growth__pulse--idle { animation: none; background: transparent; border: 1px solid var(--outline); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.72); }
+}
+
+.growth__label {
+  font-family: var(--display); font-size: var(--label-size); font-weight: 500;
+  letter-spacing: 0.09em; text-transform: uppercase;
+}
+/* Tabular figures and a reserved width, so a number that grows from 999 to 1 000 does
+ * not shift the words after it while it is animating. */
+.growth__value { font-weight: 600; color: var(--on-surface); font-variant-numeric: tabular-nums; }
+.growth__unit { color: var(--secondary); }
+.growth__sep { color: var(--secondary); }
+.growth__state { transition: color 200ms ease; }
+.growth__state.is-idle { color: var(--secondary); }
+
+.growth__link {
+  display: inline-flex; align-items: center; min-height: 32px;
+  margin-left: auto; padding: 0 var(--u2);
+  color: var(--on-surface); text-decoration: none;
+  border-bottom: 1px solid var(--outline-variant);
+  transition: border-color 150ms ease, color 150ms ease;
+}
+@media (hover: hover) {
+  .growth__link:hover { border-color: var(--primary); }
+}
+@media (max-width: 560px) {
+  .growth { border-radius: var(--radius-lg); gap: var(--u1) var(--u2); }
+  .growth__link { margin-left: 0; min-height: 44px; }
+}
+
+/* ---------- the growth page ---------- */
+
+.state-stats .top {
+  flex-direction: row; align-items: center; justify-content: space-between;
+  gap: var(--u4);
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.top__nav { display: flex; align-items: center; gap: var(--u1); }
+.top__link {
+  display: inline-flex; align-items: center; min-height: 44px;
+  padding: 0 var(--u4);
+  font-family: var(--display); font-size: 0.875rem; font-weight: 500;
+  color: var(--secondary); text-decoration: none;
+  border-radius: var(--radius);
+  transition: color 150ms ease, background-color 150ms ease;
+}
+@media (hover: hover) {
+  .top__link:hover { background: var(--surface-high); color: var(--on-surface); }
+}
+.top__link--current { color: var(--on-surface); }
+.top__link--current::after {
+  content: ""; display: block;
+  width: 6px; height: 6px; margin-left: var(--u2);
+  background: var(--primary); border-radius: var(--radius-full);
+}
+
+.stats {
+  flex: 1;
+  width: 100%; max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--u12) var(--margin) var(--u16);
+  display: flex; flex-direction: column; gap: var(--u8);
+}
+
+.stats__title { font-size: 2rem; letter-spacing: -0.02em; }
+.stats__lead { margin: 0; max-width: 62ch; color: var(--secondary); }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--u4);
+}
+
+.card {
+  display: flex; flex-direction: column; gap: var(--u2);
+  padding: var(--u6);
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  transition: border-color 200ms ease;
+}
+@media (hover: hover) {
+  .card:hover { border-color: var(--outline); }
+}
+/* The projection is the one figure that is an extrapolation rather than a reading, so
+ * it gets the width to say so next to it instead of a footnote somewhere below. */
+.card--emphasis { grid-column: 1 / -1; }
+
+.card__label {
+  font-family: var(--display); font-size: var(--label-size); font-weight: 500;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--secondary);
+}
+.card__value {
+  margin: 0;
+  font-family: var(--display); font-size: 2rem; font-weight: 600; line-height: 1.1;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+}
+/* The headline figure: the number the page is about, so it is larger than the rest.
+ * Its reel window needs no override -- `--reel-cell` is in `em`. */
+.card--hero .card__value { font-size: 2.75rem; }
+.card__note { margin: 0; font-size: 0.8125rem; color: var(--secondary); }
+
+.panel {
+  padding: var(--u8);
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+}
+.panel--plain { background: var(--surface-low); }
+.panel__head {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: var(--u2); margin-bottom: var(--u6);
+}
+.panel__title { font-size: 1.125rem; letter-spacing: -0.01em; }
+.panel__meta, .panel__note { margin: 0; font-size: 0.8125rem; color: var(--secondary); }
+.panel__note { margin-top: var(--u4); max-width: 70ch; }
+
+/* ---------- the line chart ----------
+ *
+ * The plot is an SVG stretched onto the panel: `preserveAspectRatio="none"` maps its
+ * 0-1000 × 0-100 user space onto whatever box it is given, which is what lets the
+ * geometry be computed once, on the server, without knowing the pixel width. Every
+ * stroke on it therefore carries `vector-effect: non-scaling-stroke` -- under a
+ * non-uniform scale a plain stroke would come out thicker horizontally than
+ * vertically, which reads as a rendering fault. */
+
+.chart {
+  display: flex; flex-direction: column; gap: var(--u2);
+  --chart-height: 180px;
+  /* It is a `figure`: the element is right, its default margins are not. */
+  margin: 0;
+}
+.linechart { display: block; width: 100%; height: var(--chart-height, 180px); }
+.linechart__grid line { stroke: var(--outline-variant); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.linechart__baseline { stroke: var(--outline); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.linechart__area { fill: url(#mjl-chart-fill); stroke: none; }
+.linechart__line {
+  fill: none; stroke: var(--primary); stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+/* The rate the projection is extrapolated from, as a reference line. Dashed and
+ * lighter, and that difference in weight is the whole point: the curve is measured and
+ * this is derived, and it should not read as one more reading. */
+.linechart__rate {
+  fill: none; stroke: var(--outline); stroke-width: 1.5;
+  stroke-dasharray: 5 5; vector-effect: non-scaling-stroke;
+}
+/* The newest point. Drawn as a zero-length path with a round cap rather than as a
+ * `<circle>`: the stretched viewBox would turn a circle into an ellipse, while a
+ * non-scaling stroke stays round. Same trick for its halo, which keeps the dot
+ * legible where the line passes behind it. */
+.linechart__dot-halo {
+  fill: none; stroke: var(--surface-lowest); stroke-width: 13;
+  stroke-linecap: round; vector-effect: non-scaling-stroke;
+}
+.linechart__dot {
+  fill: none; stroke: var(--primary); stroke-width: 7;
+  stroke-linecap: round; vector-effect: non-scaling-stroke;
+}
+.chart__axis {
+  position: relative; height: 1.2em;
+  /* 12px, not 11px: this is the floor the audit enforces, and it is the floor because
+   * below it a monospaced figure stops being comfortably readable at arm's length --
+   * which is where a phone is. The axis is captions, but captions are still read. */
+  font-family: var(--mono); font-size: 0.75rem; color: var(--secondary);
+}
+.chart__axis span { position: absolute; white-space: nowrap; }
+.chart__axis span:first-child { left: 0; }
+.chart__axis span:last-child { right: 0; }
+
+/* ---------- the recent-minutes table ---------- */
+
+.table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.table th, .table td {
+  padding: var(--u2) var(--u2);
+  text-align: left; border-bottom: 1px solid var(--outline-variant);
+}
+.table td { text-align: right; font-variant-numeric: tabular-nums; }
+.table thead th {
+  font-family: var(--display); font-size: var(--label-size); font-weight: 500;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--secondary);
+  border-bottom-color: var(--outline);
+}
+.table tbody tr:last-child th, .table tbody tr:last-child td { border-bottom: 0; }
+.table tbody th { font-family: var(--mono); font-weight: 400; font-variant-numeric: tabular-nums; }
+
+.notes { margin: 0; padding-left: var(--u6); display: flex; flex-direction: column; gap: var(--u2); }
+.notes li { max-width: 72ch; color: var(--on-surface-variant); font-size: 0.875rem; }
+
+@media (max-width: 900px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  .stats { padding-top: var(--u8); gap: var(--u6); }
+  .stats__title { font-size: 1.625rem; }
+  .panel { padding: var(--u6); }
+  .card { padding: var(--u4) var(--u6); }
+  .card__value { font-size: 1.625rem; }
+  .chart { --chart-height: 120px; }
+}
+
+/* ---------- motion ----------
+ *
+ * Four transitions from transitions.dev, copied from their recipes and then narrowed
+ * to what this page uses. Their variable and class names are kept as published, so a
+ * snippet can be re-copied over these blocks without a translation step.
+ *
+ * The motion tokens live here once: every effect below reads from them, so the timing
+ * of the whole page can be re-tuned from one block.
+ */
+
+:root {
+  /* 1 · number pop-in */
+  --digit-dur: 500ms;
+  --digit-distance: 8px;
+  --digit-stagger: 70ms;
+  --digit-blur: 2px;
+  --digit-ease: cubic-bezier(0.34, 1.45, 0.64, 1);
+  --digit-dir-x: 0;
+  --digit-dir-y: 1;
+
+  /* 2 · input clear with dissolve */
+  --clear-dur: 1000ms;
+  --clear-out-dur: 400ms;
+  --clear-in-dur: 400ms;
+  --clear-out-fly: 12px;
+  --clear-in-fly: 12px;
+  --clear-out-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --clear-in-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --clear-blur: 2px;
+  --glow-delay: 50ms;
+  --glow-peak-at: 0.15;
+  --glow-opacity: 0.42;
+  --glow-spread: 1.5;
+
+  /* 3 · error state shake */
+  --shake-distance: 6px;
+  --shake-overshoot: 4px;
+  --shake-dur-a: 80ms;
+  --shake-dur-b: 60ms;
+  --shake-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* 4 · spinning counter */
+  --reel-dur: 1100ms;
+  /* The reel window: one digit's worth of height, expressed in `em` rather than in
+   * `rem`, and that is load-bearing. The window has to match the type it clips, and a
+   * fixed `rem` value cannot: it was `2.9rem` at 2.75rem of type on desktop and
+   * `1.8rem` on mobile, where the media query lowered the window but not the font --
+   * so every digit was sliced by a 28.8px window over 44px glyphs and the headline
+   * number rendered cut in half. In `em` it follows the font wherever it goes, and a
+   * single number that cannot disagree with its own type is one less pair to keep in
+   * sync. */
+  --reel-cell: 1.05em;
+  --reel-spin-blur: 3px;
+  --reel-stagger: 70ms;
+  --reel-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* 5 · icon swap, used by the clear button's arrival */
+  --icon-swap-dur: 250ms;
+  --icon-swap-blur: 2px;
+  --icon-swap-ease: ease-in-out;
+}
+
+/* 1 · number pop-in — counters re-enter digit by digit, the last two staggered. */
+@keyframes t-digit-pop-in {
+  0% {
+    transform: translate(
+      calc(var(--digit-distance) * var(--digit-dir-x)),
+      calc(var(--digit-distance) * var(--digit-dir-y))
+    );
+    opacity: 0;
+    filter: blur(var(--digit-blur));
+  }
+  100% { transform: translate(0, 0); opacity: 1; filter: blur(0); }
+}
+
+.t-digit-group { display: inline-flex; align-items: baseline; }
+.t-digit { display: inline-block; will-change: transform, opacity, filter; }
+.t-digit-group.is-animating .t-digit {
+  animation: t-digit-pop-in var(--digit-dur) var(--digit-ease) both;
+}
+.t-digit-group.is-animating .t-digit[data-stagger="1"] { animation-delay: var(--digit-stagger); }
+.t-digit-group.is-animating .t-digit[data-stagger="2"] { animation-delay: calc(var(--digit-stagger) * 2); }
+
+/* 2 · input clear with dissolve — a mirror owns the glyphs while the field has a value,
+ * so they can be flown out; the fake placeholder falls in behind them. */
+.t-clear-mirror,
+.t-clear-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--u12) 0 var(--u4);
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  z-index: 2;
+}
+.t-clear-mirror { opacity: 0; }
+.t-clear-placeholder { color: var(--muted); }
+.t-clear.has-value .t-clear-mirror,
+.t-clear.is-clearing .t-clear-mirror { opacity: 1; }
+.t-clear.has-value > input,
+.t-clear.is-clearing > input { -webkit-text-fill-color: transparent; caret-color: var(--on-surface); }
+.t-clear.has-value .t-clear-placeholder { opacity: 0; }
+
+/* The streak layer: empty at rest; JS writes a stack of radial gradients into its
+ * background for the duration of a clear, one per word. `multiply` darkens the surface
+ * underneath, which is the light-mode half of the recipe. */
+.t-clear-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  mix-blend-mode: multiply;
+}
+
+/* 3 · error state shake — the box shoves once and takes the error border. */
+.t-clear {
+  will-change: transform;
+  transition: border-color 150ms ease-out, box-shadow 150ms ease;
+}
+.t-clear.is-error { border-color: var(--error); }
+.t-clear.is-error input::placeholder { color: var(--on-error-container); }
+.t-clear.is-shaking {
+  animation: t-input-shake calc(var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2) linear;
+}
+@keyframes t-input-shake {
+  0%     { transform: translateX(0); animation-timing-function: var(--shake-ease); }
+  28.57% { transform: translateX(var(--shake-distance)); animation-timing-function: var(--shake-ease); }
+  57.14% { transform: translateX(calc(var(--shake-distance) * -1)); animation-timing-function: var(--shake-ease); }
+  78.57% { transform: translateX(var(--shake-overshoot)); animation-timing-function: var(--shake-ease); }
+  100%   { transform: translateX(0); }
+}
+
+/* 4 · spinning counter — each digit is a clipped reel of 0-9 cells that spins up to
+ * its target. Built in JS; this only owns the window it spins in. */
+.t-reel {
+  display: inline-flex;
+  align-items: center;
+  height: var(--reel-cell);
+  font-variant-numeric: tabular-nums;
+}
+.t-reel-col {
+  position: relative;
+  height: var(--reel-cell);
+  width: 1ch;
+  overflow: hidden;
+  /* Soft-fade the window edges instead of hard-cropping the digits as they pass. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 78%, transparent 100%);
+}
+.t-reel-strip { display: flex; flex-direction: column; will-change: transform, filter; }
+.t-reel-digit {
+  height: var(--reel-cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 5 · shimmer, for the one label that means "work is happening right now". */
+@keyframes t-shimmer {
+  from { background-position: 160% 0; }
+  to   { background-position: -60% 0; }
+}
+.growth__state--live {
+  background-image: linear-gradient(
+    90deg,
+    var(--on-surface) 0%, var(--on-surface) 40%, var(--secondary) 55%, var(--on-surface) 70%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: t-shimmer 2.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .hit { animation: none; }
+  /* The recipes require this guard, and it is kept verbatim: the effects below are
+   * decoration, and a reader who asked for less motion gets none of them. */
+  .t-digit-group .t-digit { animation: none !important; }
+  .t-clear-glow { opacity: 0 !important; }
+  .t-clear { animation: none !important; transform: none !important; }
+  .t-reel-strip { transition: none !important; filter: none !important; }
+  .t-clear-btn { transition: none !important; }
+  .growth__state--live { animation: none; color: var(--on-surface); background-image: none; }
+}
+
+@media (max-width: 720px) {
+  :root { --margin: 1rem; }
+  .state-results .top { gap: var(--u2); padding: var(--u2) var(--margin); }
+  /* The name gets smaller rather than disappearing: with the mark gone it *is* the
+   * home link, and hiding it would leave a link with nothing to click. */
+  .state-results .brand__name { font-size: 1rem; }
+  .state-results .brand { padding: 0; }
+  .results { padding-top: var(--u4); }
+  .hit__title { font-size: 1.0625rem; }
+}
+
+/* Below the width where a wordmark and a usable field can share a row, the bar takes
+ * two rows instead of squeezing the field: the name keeps its meaning and the input
+ * keeps enough width to show what was typed. `min-width` rather than a fixed height,
+ * so the box only moves down when the row genuinely does not fit. */
+@media (max-width: 400px) {
+  .state-results .top { flex-wrap: wrap; row-gap: var(--u2); }
+  .state-results .box { flex-basis: 100%; }
+}

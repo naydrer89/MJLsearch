@@ -1,0 +1,98 @@
+# Four services over one shared data directory.
+#
+#   crawler    fetches, parses, writes WARC, seals spool segments
+#   indexer    drains those segments into data/index/shard-000, and is the only writer
+#   api        reads data/index/shard-000, mounted read-only
+#   dashboard  the same routers plus the front end, on port 5000
+#
+# The crawler and the indexer meet on the spool directory rather than on a shared
+# database. That is not a stylistic choice: RocksDB takes an exclusive lock on its
+# directory, so two processes cannot share one, and the indexer must delete the
+# documents it has consumed, which rules out a read-only handle as well. A
+# directory of sealed segments has neither problem, and a crash replays instead of
+# losing work.
+#
+# The read-only mount on the API and dashboard is the container-level expression
+# of the rule that Tantivy permits exactly one writer and neither of them is it.
+
+name: mjlsearch
+
+services:
+  crawler:
+    build:
+      context: .
+      dockerfile: Dockerfile.crawler
+    # Seeds are the only required argument.
+    command: ["https://example.com"]
+    environment:
+      RUST_LOG: info
+      SEARCH_ROCKSDB_DIR: /data/rocksdb
+      SEARCH_WARC_DIR: /data/warc
+      SEARCH_BLOOM_PATH: /data/urls.bloom
+      SEARCH_SPOOL_DIR: /data/spool
+      SEARCH_CRAWL_STATS: /data/crawl-stats.json
+    volumes:
+      - ./data:/data
+    restart: "no"
+
+  indexer:
+    build:
+      context: .
+      dockerfile: Dockerfile.crawler
+    # Same image as the crawler, different binary: they share the RocksDB build,
+    # so a second image would only double build time.
+    entrypoint: ["/usr/local/bin/indexer"]
+    environment:
+      RUST_LOG: info
+      SEARCH_SPOOL_DIR: /data/spool
+      SEARCH_INDEX_DIR: /data/index/shard-000
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      SEARCH_INDEX_DIR: /data/index/shard-000
+      SEARCH_SPOOL_DIR: /data/spool
+      SEARCH_CRAWL_STATS: /data/crawl-stats.json
+      SEARCH_LOG_LEVEL: INFO
+      # Nowhere to play a chime in a container, and it would only spam the log.
+      SEARCH_STARTUP_SOUND: "0"
+      # Bounded deliberately: extra workers share the same mmap'd index pages and
+      # mostly add CPU contention.
+      SEARCH_WORKERS: "2"
+    volumes:
+      # Read-only. The API has no business writing the index.
+      - ./data:/data:ro
+    depends_on:
+      - indexer
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "5000:5000"
+    environment:
+      # Reads the API over HTTP rather than opening the index itself, so it has
+      # no Rust stack, no mmap and no Tantivy in the process.
+      SEARCH_BACKEND_URL: http://api:8000
+      # The dashboard binds through SEARCH_HOST, which defaults to loopback for
+      # local use; a container has to be reachable from outside itself.
+      SEARCH_HOST: 0.0.0.0
+      SEARCH_DASHBOARD_PORT: "5000"
+      SEARCH_LOG_LEVEL: INFO
+      SEARCH_STARTUP_SOUND: "0"
+    # Flask's development server. Swap for a WSGI server in production:
+    #   entrypoint: ["gunicorn", "--bind", "0.0.0.0:5000", "dashboard.app:app"]
+    entrypoint: ["python", "-m", "dashboard.app"]
+    volumes: []
+    depends_on:
+      - api
+    restart: unless-stopped

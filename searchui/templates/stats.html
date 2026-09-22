@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" style="color-scheme: light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f9f9f9">
+<meta name="description" content="How fast the MJLsearch index is growing, and what the current rate implies.">
+<title>Growth — MJLsearch</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23000'/%3E%3Ctext x='16' y='23' font-family='system-ui,sans-serif' font-size='20' font-weight='600' fill='%23fff' text-anchor='middle'%3EM%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="{{ url_for('static', filename='search.css') }}">
+</head>
+
+<body class="state-stats" data-stats>
+
+<a class="skip" href="#growth-main">Skip to content</a>
+
+<header class="top">
+  <a class="brand" href="{{ url_for('index') }}">
+    <span class="brand__name">MJLsearch</span>
+  </a>
+
+  <nav class="top__nav" aria-label="Sections">
+    <a class="top__link" href="{{ url_for('index') }}">Search</a>
+    <a class="top__link top__link--current" href="{{ url_for('stats') }}" aria-current="page">Growth</a>
+  </nav>
+</header>
+
+<main id="growth-main" class="stats" data-stat-source="{{ url_for('api_growth') }}">
+  <h1 class="stats__title">Index growth</h1>
+  <p class="stats__lead">
+    How many documents became searchable, when they arrived, and what the current rate
+    implies for the next hour.
+  </p>
+
+  {% if not growth.available %}
+    <div class="notice" role="status">
+      <h2 class="notice__title">No growth reading yet</h2>
+      <p class="notice__body">
+        The indexer writes this timeline as it commits. Nothing has been drained yet, so
+        there is no history to draw — the counters below will fill in as soon as the first
+        segment lands.
+      </p>
+      <p class="notice__hint">
+        The API is at <code translate="no">{{ backend }}</code>; the strip at the bottom of
+        this page shows the same feed.
+      </p>
+    </div>
+  {% endif %}
+
+  {# Five figures, in the order the question is asked: how much is there, how much
+     arrived, how fast, and what that implies. #}
+  <section class="cards" aria-label="Key figures">
+    {# The headline figure rolls rather than fades: it is the number the page is about,
+       and a change in it is the event the whole page exists to report. The reel is
+       built by motion.js from this text, which is why the markup is a plain number and
+       the spoken version sits beside it rather than inside it. #}
+    <article class="card card--hero">
+      <h2 class="card__label">In the index</h2>
+      <p class="card__value mono t-reel" data-reel="total" aria-hidden="true">{{ growth.total_documents | count }}</p>
+      <p class="sr-only" data-reel-text="total">{{ growth.total_documents }} documents in the index</p>
+      <p class="card__note">Documents searchable right now.</p>
+    </article>
+
+    <article class="card">
+      <h2 class="card__label">Last hour</h2>
+      <p class="card__value mono" data-stat="hour">{{ growth.documents_last_hour | count }}</p>
+      <p class="card__note">New documents that became searchable in the last 60 minutes.</p>
+    </article>
+
+    <article class="card">
+      <h2 class="card__label">Last 15 minutes</h2>
+      <p class="card__value mono" data-stat="quarter">{{ growth.documents_last_quarter | count }}</p>
+      <p class="card__note">
+        The window the rate is measured over: short enough to react to a crawl that
+        just started or just stopped.
+      </p>
+      <p class="card__note">Both figures count documents the index <em>gained</em>, so
+        they add up to the total: re-indexing a page already here is work, not growth.</p>
+    </article>
+
+    <article class="card">
+      <h2 class="card__label">Rate</h2>
+      <p class="card__value mono" data-stat="rate">{{ '%.1f'|format(growth.rate_per_minute or 0) }}</p>
+      <p class="card__note">Documents per minute, averaged over those 15 minutes.</p>
+    </article>
+
+    <article class="card card--emphasis">
+      <h2 class="card__label">Expected next hour</h2>
+      <p class="card__value mono" data-stat="projected">{{ growth.projected_next_hour | count }}</p>
+      <p class="card__note">
+        The current rate extended over an hour. A projection, not a promise: it is what
+        this rate implies, and it moves the moment the rate does.
+      </p>
+    </article>
+  </section>
+
+  <section class="panel" aria-labelledby="chart-title">
+    <header class="panel__head">
+      <h2 class="panel__title" id="chart-title">Last {{ chart_minutes }} minutes</h2>
+      <p class="panel__meta">
+        Peak <span class="mono" data-stat="peak">{{ series.peak | count }}</span>/min
+        · dashed: current rate
+        <span class="mono" data-stat="rate-inline">{{ '%.1f'|format(growth.rate_per_minute or 0) }}</span>/min
+      </p>
+    </header>
+
+    {# One line through every minute of the window, drawn from geometry the server
+       computed, plus a dashed line for the rate the projection is built from. Both are
+       paths rather than bars so a new commit moves the whole curve instead of repainting
+       it — see the morph in search.js.
+
+       `preserveAspectRatio="none"` is what lets a 0-1000 × 0-100 user space land on a
+       panel of any width; every stroke carries a non-scaling stroke so it stays the
+       same thickness in both axes. #}
+    <figure class="chart" data-chart>
+      <svg class="linechart" viewBox="0 0 1000 100" preserveAspectRatio="none"
+           role="img"
+           aria-label="Documents gained per minute over the last {{ chart_minutes }} minutes, {{ series.peak }} at the peak, with the current average rate of {{ '%.1f'|format(growth.rate_per_minute or 0) }} per minute marked">
+        <defs>
+          <linearGradient id="mjl-chart-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#000000" stop-opacity="0.14"></stop>
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.01"></stop>
+          </linearGradient>
+        </defs>
+
+        {# Quarter lines, so a flat stretch can be read as "low" rather than "the axis". #}
+        <g class="linechart__grid" aria-hidden="true">
+          <line x1="0" y1="6" x2="1000" y2="6"></line>
+          <line x1="0" y1="28" x2="1000" y2="28"></line>
+          <line x1="0" y1="50" x2="1000" y2="50"></line>
+          <line x1="0" y1="72" x2="1000" y2="72"></line>
+        </g>
+
+        <path class="linechart__area" data-line-area d="{{ series.area }}"></path>
+        <path class="linechart__rate" data-line-rate d="{{ series.rate_line }}"></path>
+        <path class="linechart__line" data-line d="{{ series.line }}"></path>
+        <path class="linechart__dot-halo" data-line-dot d="{{ series.dot }}"></path>
+        <path class="linechart__dot" data-line-dot d="{{ series.dot }}"></path>
+
+        <line class="linechart__baseline" x1="0" y1="98" x2="1000" y2="98"
+              vector-effect="non-scaling-stroke" aria-hidden="true"></line>
+      </svg>
+
+      <figcaption class="chart__axis" aria-hidden="true">
+        <span>−{{ chart_minutes }} min</span>
+        <span>now</span>
+      </figcaption>
+    </figure>
+
+    <p class="panel__note">
+      Every minute of the window is on the line, empty ones included, so a flat
+      stretch means nothing arrived — which is also what a finished crawl looks like.
+      The dashed line is the average rate the projection is extrapolated from, so the
+      minutes above it were busier than the rate and the minutes below it quieter.
+    </p>
+  </section>
+
+  <section class="panel" aria-labelledby="recent-title">
+    <header class="panel__head">
+      <h2 class="panel__title" id="recent-title">Most recent minutes</h2>
+      <p class="panel__meta mono">last commit {{ growth.age_seconds | age }}</p>
+    </header>
+
+    <table class="table">
+      <caption class="sr-only">Documents gained per minute, newest first</caption>
+      <thead>
+        <tr><th scope="col">Minute (UTC)</th><th scope="col">Documents</th></tr>
+      </thead>        <tbody data-recent>
+        {% for point in recent %}
+          <tr>
+            <th scope="row" class="mono">{{ point.at | clock }}</th>
+            <td class="mono" data-documents="{{ point.documents }}">{{ point.documents | count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="panel panel--plain" aria-labelledby="reading-title">
+    <h2 class="panel__title" id="reading-title">How to read this</h2>
+    <ul class="notes">
+      <li>
+        Every figure comes from the indexer's own timeline of commits, not from a counter
+        differenced by this page, so the numbers are right for a server that started a
+        second ago and for one that has been up for a week.
+      </li>
+      <li>
+        Growth is bounded by what the crawler finds. When the frontier empties the rate
+        falls to zero and the expected hour with it — an idle indexer is the expected
+        end state of a finished crawl, not a fault.
+      </li>
+      <li>
+        The projection is a straight line on the last 15 minutes. It cannot know about a
+        crawl that has not been started, so treat it as the shape of the current trend
+        rather than a forecast.
+      </li>
+    </ul>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="foot__row">
+    <span>MJLsearch growth</span>
+    <span class="mono">{{ backend }}</span>
+  </div>
+  {% include "_growth.html" %}
+</footer>
+
+{# The reel's motion streak is a vertical-only blur, which CSS cannot express: a CSS
+   blur would smear the digits sideways and read as a rendering fault. The filter is
+   defined once here and applied by motion.js while a column is spinning. #}
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+  <filter id="mjl-reel-blur" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur stdDeviation="0 3"></feGaussianBlur>
+  </filter>
+</svg>
+
+{# motion.js first: search.js calls into it, and both are deferred, so they run in the
+   order they appear. #}
+<script src="{{ url_for('static', filename='motion.js') }}" defer></script>
+<script src="{{ url_for('static', filename='search.js') }}" defer></script>
+</body>
+</html>

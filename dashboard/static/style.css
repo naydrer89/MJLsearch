@@ -1,0 +1,468 @@
+/* Monochrome Minimalist.
+ *
+ * The palette is strictly achromatic: every hierarchy decision is made with
+ * contrast, scale and weight instead of hue. The one exception is the error
+ * colour, which is allowed to be a colour because a failure that looks like
+ * ordinary content is a usability bug.
+ *
+ * Tokens below are the design system's, kept as variables so that a rule never
+ * carries a raw hex value.
+ */
+
+:root {
+  /* surfaces */
+  --surface: #f9f9f9;
+  --surface-lowest: #ffffff;
+  --surface-low: #f3f3f3;
+  --surface-container: #eeeeee;
+  --surface-high: #e8e8e8;
+  --surface-variant: #e2e2e2;
+
+  /* ink */
+  --on-surface: #1b1b1b;
+  --on-surface-variant: #4c4546;
+  --primary: #000000;
+  --on-primary: #ffffff;
+  --secondary: #5e5e63;
+  --muted: #999999;
+
+  /* lines and states */
+  --outline-variant: #e5e5e5;
+  --outline: #7e7576;
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+
+  /* shape */
+  --radius-sm: 0.25rem;
+  --radius: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* spacing, on a 4px rhythm */
+  --u1: 0.25rem;
+  --u2: 0.5rem;
+  --u4: 1rem;
+  --u6: 1.5rem;
+  --u8: 2rem;
+  --u12: 3rem;
+  --u16: 4rem;
+  --margin: 2.5rem;
+
+  /* The design system's smallest defined step is `label-md` at 12px, which is also
+   * the floor below which text stops being comfortably readable. Every label role
+   * draws from this one token instead of repeating a size that can drift. */
+  --label-size: 0.75rem;
+
+  --display: "Geist", "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --shadow-ambient: 0 12px 40px rgba(0, 0, 0, 0.05);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: var(--body);
+  font-size: 1rem;
+  line-height: 1.6;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+
+.mono, code, .num, .card__value, .lede__value { font-variant-numeric: tabular-nums; }
+.mono, code { font-family: var(--mono); }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+.skip-link {
+  position: absolute; left: var(--u4); top: -100px;
+  z-index: 10; padding: var(--u2) var(--u4);
+  /* Sized to the 44px touch floor rather than to its text: it is a control, and
+   * on a touch device it has to be reachable like one. */
+  display: inline-flex; align-items: center; min-height: 44px;
+  background: var(--primary); color: var(--on-primary);
+  border-radius: var(--radius); text-decoration: none;
+  transition: top 150ms ease;
+}
+.skip-link:focus { top: var(--u4); }
+
+/* Visible focus everywhere, and only for keyboard users. */
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---------- bar ---------- */
+
+.bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--u4) var(--u6);
+  max-width: 1280px; margin: 0 auto;
+  padding: var(--u6) var(--margin) var(--u4);
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+/* The name is the brand; there is no mark beside it any more. */
+.bar__mark { display: flex; align-items: center; gap: var(--u2); }
+
+.wordmark {
+  font-family: var(--display); font-size: 1rem; font-weight: 600;
+  letter-spacing: -0.01em; line-height: 1;
+}
+.wordmark__sub {
+  display: block; margin-top: var(--u1);
+  font-size: var(--label-size); font-weight: 500; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--secondary);
+}
+
+.search { display: flex; gap: var(--u2); flex: 1 1 320px; min-width: 0; }
+
+.search input {
+  flex: 1; min-width: 0; min-height: 44px;
+  padding: 0 var(--u4);
+  font: inherit; color: var(--on-surface);
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+  transition: border-color 150ms ease;
+}
+.search input::placeholder { color: var(--muted); }
+.search input:hover { border-color: var(--outline); }
+.search input:focus { border-color: var(--primary); outline-offset: 0; }
+
+.bar__actions { display: flex; align-items: center; gap: var(--u2); }
+
+.btn {
+  min-height: 44px; padding: 0 var(--u4);
+  font-family: var(--display); font-size: 0.8125rem; font-weight: 500;
+  letter-spacing: 0.01em;
+  border-radius: var(--radius); cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.btn--primary {
+  background: var(--primary); color: var(--on-primary);
+  border: 1px solid var(--primary);
+}
+.btn--primary:hover { background: #2b2b2b; border-color: #2b2b2b; }
+.btn--primary[aria-busy="true"] { background: var(--secondary); border-color: var(--secondary); }
+.btn--ghost {
+  background: transparent; color: var(--on-surface);
+  border: 1px solid transparent;
+}
+.btn--ghost:hover { background: var(--surface-high); }
+.btn--ghost[aria-pressed="true"] { background: var(--surface-container); border-color: var(--outline-variant); }
+
+.switch { display: flex; align-items: center; gap: var(--u2); cursor: pointer; min-height: 44px; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch__track {
+  width: 38px; height: 22px; flex: none; padding: 2px;
+  background: var(--surface-variant); border-radius: var(--radius-full);
+  transition: background-color 150ms ease;
+}
+.switch__thumb {
+  display: block; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--surface-lowest); border: 1px solid var(--outline-variant);
+  transition: transform 150ms ease;
+}
+.switch input:checked + .switch__track { background: var(--primary); }
+.switch input:checked + .switch__track .switch__thumb { transform: translateX(16px); }
+.switch input:focus-visible + .switch__track { outline: 2px solid var(--primary); outline-offset: 2px; }
+.switch__label {
+  font-family: var(--display); font-size: 0.8125rem; font-weight: 500;
+  color: var(--on-surface-variant);
+}
+
+/* ---------- notice ---------- */
+
+.notice {
+  max-width: 1280px; margin: var(--u4) auto 0;
+  padding: var(--u4) var(--u6);
+  border: 1px solid var(--outline-variant); border-left-width: 3px;
+  border-radius: var(--radius-md);
+  background: var(--surface-lowest);
+  font-size: 0.875rem;
+}
+.notice[data-tone="error"] {
+  border-color: var(--error); border-left-color: var(--error);
+  background: var(--error-container); color: var(--on-error-container);
+}
+.notice[hidden] { display: none; }
+
+/* ---------- layout ---------- */
+
+main { max-width: 1280px; margin: 0 auto; padding: var(--u8) var(--margin) var(--u12); }
+section + section { margin-top: var(--u12); }
+
+.lede {
+  display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2.2fr);
+  gap: var(--u6) var(--u8); align-items: end;
+}
+
+.lede__label, .card__label, .section__title {
+  font-family: var(--display); font-size: var(--label-size); font-weight: 500;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--secondary);
+}
+
+.lede__value {
+  margin: var(--u2) 0 0;
+  font-family: var(--display); font-size: clamp(2.75rem, 8vw, 3.5rem);
+  font-weight: 600; line-height: 1.05; letter-spacing: -0.03em;
+}
+.lede__meta { margin: var(--u2) 0 0; font-size: 0.875rem; color: var(--on-surface-variant); }
+
+.lede__chart { margin: 0; min-width: 0; }
+.lede__chart canvas { display: block; width: 100%; height: 120px; margin-top: var(--u2); }
+.lede__legend { margin: var(--u2) 0 0; font-size: 0.8125rem; color: var(--secondary); }
+#series-window { margin-left: var(--u2); color: var(--secondary); text-transform: none; letter-spacing: 0; }
+
+/* Six cards, laid out in explicit steps rather than by `auto-fit`.
+ *
+ * `auto-fit` decided on width alone, which at 1280px packed five cards into the
+ * first row and stranded the sixth alone on the second -- a balanced grid is a
+ * deliberate choice for a known card count, not an emergent one. Mobile-first, so
+ * the single-column case is the default rather than an override. */
+.cards {
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  gap: var(--u4);
+}
+
+@media (min-width: 600px) {
+  .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 900px) {
+  .cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.card {
+  min-width: 0;
+  padding: var(--u6);
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+.card:hover { border-color: var(--outline); transform: translateY(-1px); }
+
+.card__value {
+  margin: var(--u2) 0 0;
+  font-family: var(--display); font-size: 1.75rem; font-weight: 600;
+  line-height: 1.15; letter-spacing: -0.02em;
+}
+.card__meta { margin: var(--u2) 0 0; font-size: 0.8125rem; color: var(--on-surface-variant); overflow-wrap: anywhere; }
+.card__meta--warn { color: var(--error); }
+
+.section__head {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
+  gap: var(--u2) var(--u4); margin-bottom: var(--u4);
+}
+.section__note { margin: 0; font-size: 0.8125rem; color: var(--secondary); }
+
+/* Two columns from tablet up, because the third panel spans the full width: with
+ * three columns it left a dead cell beside the two narrow ones. */
+.panels { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--u4); }
+
+@media (min-width: 720px) {
+  .panels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.panel {
+  min-width: 0; padding: var(--u6);
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-lg);
+}
+.panel--wide { grid-column: 1 / -1; }
+
+/* ---------- tables ---------- */
+
+table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+th, td { padding: var(--u2) var(--u2); text-align: left; border-bottom: 1px solid var(--outline-variant); }
+th {
+  font-family: var(--display); font-size: var(--label-size); font-weight: 500;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--secondary);
+}
+tbody tr:last-child td { border-bottom: 0; }
+tbody td { transition: background-color 150ms ease; }
+td.num, th.num { text-align: right; }
+td.query { font-family: var(--mono); overflow-wrap: anywhere; min-width: 0; }
+.empty td { color: var(--secondary); font-style: normal; padding: var(--u4) var(--u2); }
+
+/* Hover styling is scoped to pointers that can actually hover. On a touch screen
+ * `:hover` latches after a tap, so a row stayed highlighted with nothing selected. */
+@media (hover: hover) {
+  tbody tr:hover td { background: var(--surface-low); }
+}
+
+tbody tr:focus-within td { background: var(--surface-low); }
+
+.tag {
+  display: inline-block; padding: 0 var(--u2);
+  font-family: var(--display); font-size: var(--label-size); font-weight: 500;
+  letter-spacing: 0.04em; line-height: 1.5;
+  border: 1px solid var(--outline-variant); border-radius: var(--radius-full);
+  color: var(--on-surface-variant); background: var(--surface-low);
+  white-space: nowrap;
+}
+.tag--hit { color: var(--on-surface); border-color: var(--outline); }
+.tag--error { color: var(--on-error-container); border-color: var(--error); background: var(--error-container); }
+
+/* ---------- results ---------- */
+
+.result {
+  padding: var(--u4) 0;
+  border-bottom: 1px solid var(--outline-variant);
+}
+.result:last-child { border-bottom: 0; }
+.result__title {
+  font-family: var(--display); font-size: 1.0625rem; font-weight: 600;
+  color: var(--primary); text-decoration: none; letter-spacing: -0.01em;
+  /* The link is the primary thing a reader taps, so its hit box is padded out to
+   * the 44px floor while the text itself keeps its own line height. A bare inline
+   * link is 22px tall, which is half of what a thumb needs. */
+  display: inline-flex; align-items: center; min-height: 44px;
+  transition: color 150ms ease;
+}
+.result__title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.result__url {
+  display: block; margin-top: var(--u1);
+  font-family: var(--mono); font-size: 0.75rem; color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+.result__snippet { margin: var(--u2) 0 0; color: var(--on-surface-variant); }
+.result__snippet b { font-weight: 600; color: var(--on-surface); background: var(--surface-high); }
+.result__meta { margin: var(--u2) 0 0; font-size: 0.75rem; color: var(--secondary); }
+.results__empty { margin: 0; padding: var(--u4) 0; color: var(--secondary); }
+
+.results__summary { display: flex; flex-wrap: wrap; gap: var(--u2); align-items: center; }
+
+.tailnote { margin: var(--u12) 0 0; font-size: 0.8125rem; color: var(--secondary); }
+.tailnote code { background: var(--surface-container); padding: 0 var(--u1); border-radius: var(--radius-sm); }
+
+.foot {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--u2);
+  max-width: 1280px; margin: 0 auto;
+  padding: var(--u6) var(--margin) var(--u12);
+  border-top: 1px solid var(--outline-variant);
+  font-size: 0.75rem; color: var(--secondary);
+}
+
+/* ---------- live indicator ---------- */
+
+.pulse {
+  display: inline-block; width: 6px; height: 6px; margin-right: var(--u2);
+  border-radius: 50%; background: var(--primary); vertical-align: middle;
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* ---------- motion ---------- */
+
+/* Reveal is a first-paint flourish, and it is the only place translateY is used:
+ * movement that does not encode anything is decoration, and decoration that costs
+ * a compositor pass every refresh is a bad trade. */
+.reveal { animation: reveal 260ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.reveal:nth-child(2) { animation-delay: 40ms; }
+.reveal:nth-child(3) { animation-delay: 80ms; }
+.reveal:nth-child(4) { animation-delay: 120ms; }
+.reveal:nth-child(5) { animation-delay: 160ms; }
+.reveal:nth-child(6) { animation-delay: 200ms; }
+
+@keyframes reveal {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.result { animation: rise 200ms ease-out both; }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .reveal, .result { animation: none; }
+  .card:hover { transform: none; }
+  .pulse { animation: none; }
+}
+
+@media (max-width: 860px) {
+  :root { --margin: 1rem; }
+  .lede { grid-template-columns: 1fr; align-items: start; }
+  .bar { padding-top: var(--u4); }
+  .bar__actions { width: 100%; justify-content: space-between; }
+}
+
+/* Six columns of numbers cannot fit a phone: the table either overflows the
+ * viewport -- which is exactly what it did, forcing an 18px sideways scroll on the
+ * whole page -- or squeezes the cells until nothing is readable. So below this
+ * width each row becomes a stack of label/value pairs, and each cell supplies its
+ * own heading from `data-label`, which the JavaScript rows set from the same
+ * strings the header cells use.
+ *
+ * The `<thead>` stays in the DOM, clipped rather than removed: a screen reader
+ * still gets the real column headers and the real table semantics, which a
+ * `display: none` on it would throw away. */
+@media (max-width: 640px) {
+  .panel table, .panel tbody, .panel tr, .panel td { display: block; width: 100%; }
+
+  .panel thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+  /* The header cells must not keep their intrinsic column widths inside that 1px
+   * box: a wide header such as "Cache" still measured its full width, which pushed
+   * a nominally 1px element 18px past the viewport edge. */
+  .panel thead tr, .panel thead th { display: block; width: 1px; }
+
+  .panel tbody tr {
+    padding: var(--u2) 0;
+    border-bottom: 1px solid var(--outline-variant);
+  }
+  .panel tbody tr:last-child { border-bottom: 0; }
+
+  .panel td {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: var(--u4); padding: var(--u1) 0; border-bottom: 0;
+  }
+  .panel td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    font-family: var(--display); font-size: var(--label-size); font-weight: 500;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--secondary);
+  }
+  .panel td.num { text-align: right; }
+  .panel td.query { overflow-wrap: anywhere; }
+
+  /* A cell with no header of its own -- the "nothing here yet" row spanning every
+   * column -- must not render an empty label in front of its message. */
+  .panel td:not([data-label])::before { content: none; }
+  .panel .empty td { display: block; padding: var(--u4) 0; }
+}
+
+@media (max-width: 560px) {
+  .lede__value { font-size: 2.5rem; }
+  .search { flex-basis: 100%; }
+  /* The bar's mark and wordmark take the whole first line, so the controls get a
+   * row of their own rather than wrapping raggedly around them. */
+  .bar__mark { flex: 1 1 100%; }
+  .btn { flex: 1 1 auto; justify-content: center; }
+}

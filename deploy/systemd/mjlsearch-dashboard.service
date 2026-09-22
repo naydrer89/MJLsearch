@@ -1,0 +1,39 @@
+# Template: filled in by deploy/setup-server.sh.
+#
+# The operator console reads the API over HTTP and holds no index handle, which is why
+# it can report the API being down instead of going down with it. It stays on loopback:
+# it exposes crawler internals and has no authentication in front of it.
+[Unit]
+Description=MJLsearch operator dashboard
+Documentation=file:@APPDIR@/.freebuff/run.md
+After=network-online.target mjlsearch-api.service
+Wants=network-online.target mjlsearch-api.service
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+Group=@SERVICE_GROUP@
+WorkingDirectory=@APPDIR@
+EnvironmentFile=-/etc/default/mjlsearch
+
+# No chime: there is no audio device behind a service, and the journal is where this
+# unit's output goes. Set to 1 in /etc/default/mjlsearch to have it back.
+Environment=SEARCH_STARTUP_SOUND=0
+Environment=PATH=@SERVICE_HOME@/.local/bin:@APPDIR@/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=@SERVICE_HOME@
+
+ExecStart=@APPDIR@/scripts/run_dashboard.sh
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+
+NoNewPrivileges=yes
+ProtectSystem=full
+ReadWritePaths=@APPDIR@
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,47 @@
+# Template: filled in by deploy/setup-server.sh.
+#
+# `crawl_official.sh --loop` runs rounds back to back, each one several slices with a
+# drain between them, and sleeps 20s in between; this unit restarts it if it ever exits,
+# so the crawl stays active across a crash as well as across rounds. Rounds accumulate
+# rather than repeat -- the frontier and the seen-set persist -- so the next round spends
+# its budget on URLs the previous one discovered instead of re-fetching what is already
+# indexed.
+#
+# Deliberately below the API and the pages: this is the one process that leaves the
+# machine, it is never on a request path, and it should lose every argument with a
+# visitor over CPU and disk.
+[Unit]
+Description=MJLsearch crawl rounds (keeps the index growing)
+Documentation=file:@APPDIR@/.freebuff/run.md
+After=network-online.target mjlsearch-api.service
+Wants=network-online.target
+# Not started when the operator asked for a quiet box.
+ConditionPathExists=@APPDIR@/seeds/official.txt
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+Group=@SERVICE_GROUP@
+WorkingDirectory=@APPDIR@
+EnvironmentFile=-/etc/default/mjlsearch
+Environment=PATH=@SERVICE_HOME@/.local/bin:@APPDIR@/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=HOME=@SERVICE_HOME@
+
+ExecStart=@APPDIR@/scripts/crawl_official.sh --loop 20
+Restart=always
+RestartSec=60
+
+Nice=10
+IOSchedulingClass=idle
+CPUWeight=50
+
+NoNewPrivileges=yes
+ProtectSystem=full
+ReadWritePaths=@APPDIR@
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target
