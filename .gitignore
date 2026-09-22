@@ -20,6 +20,12 @@ __pycache__/
 # --- Local config / secrets ---
 .env
 
+# --- Runtime state: logs, pids, crawl output ---
+/logs/
+
+# --- Freebuff workspace state ---
+.freebuff/
+
 # --- Editor / OS ---
 .idea/
 .vscode/

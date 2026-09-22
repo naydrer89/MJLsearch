@@ -172,6 +172,29 @@ different files — `data/rocksdb` and `data/urls.bloom` — and removing only t
 leaves a crawler that believes every URL has already been fetched, exits zero, and
 looks like a successful crawl of a site with nothing new. `--fresh` removes both.
 
+### Managing the stack: manage.py
+
+`manage.py` is a single stdlib-only file for servers and everyday use — it starts,
+stops and inspects the whole stack, and it picks ports:
+
+```bash
+python3 manage.py start                    # build if needed, start api + ui + dashboard
+python3 manage.py start --crawl            # ... plus looping crawl rounds
+python3 manage.py start --host 0.0.0.0     # bind all interfaces (a public server)
+python3 manage.py start --api-port 8100 --ui-port 5101   # explicit ports
+python3 manage.py start --pick             # auto-select a free port when one is taken
+python3 manage.py status                   # what is up, on which port, answering?
+python3 manage.py status --json            # machine-readable
+python3 manage.py logs api -f              # tail a log (api|ui|dashboard|crawl)
+python3 manage.py stop                     # stop exactly what manage.py started
+```
+
+Everything it starts is detached into its own session and recorded in `logs/<name>.pid`,
+so `stop` is exact — it kills only processes this tool started, never something that
+merely holds a port — and a second `start` reuses services that already answer instead
+of restarting them. On a server, `manage.py start --host 0.0.0.0 --crawl` after
+`deploy/setup-server.sh` is the whole runtime story.
+
 ## The dashboard
 
 One static page, no framework and no build step, polling `/analytics/overview`
