@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     # index itself: it is a viewer, and a viewer that shares a process with the
     # thing it is watching cannot report on that thing being down.
     backend_url: str = "http://127.0.0.1:8000"
+    # The MJL Platform frontend that proxies into this API. Not used by the
+    # API itself; it documents the deployment and keeps the compose file honest.
+    mjl_platform_url: str = "http://127.0.0.1:3000"
     # Seconds the dashboard waits for the API before showing an unreachable
     # state. Short on purpose: a stalled dashboard is worse than an honest error.
     backend_timeout_seconds: float = Field(default=3.0, gt=0)
