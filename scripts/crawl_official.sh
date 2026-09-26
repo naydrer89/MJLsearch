@@ -24,6 +24,7 @@
 #   SLICES=10 scripts/crawl_official.sh  # a longer, finer-grained run
 #   scripts/crawl_official.sh --fresh    # rebuild the corpus from nothing first
 #   scripts/crawl_official.sh --loop 20  # rounds back to back, 20s apart, forever
+#   OVERLAP_DRAIN=1 scripts/crawl_official.sh --loop 20
 #
 # `--loop` is what keeps the growth page honest: the default is one round, which ends,
 # and an index that stops growing is what /stats looks like when nobody is crawling.
@@ -64,6 +65,7 @@ done
 
 PAGES_PER_SLICE="${positional[0]:-${PAGES_PER_SLICE:-750}}"
 SLICES="${positional[1]:-${SLICES:-6}}"
+OVERLAP_DRAIN="${OVERLAP_DRAIN:-0}"
 
 CRAWLER="./target/release/crawler"
 INDEXER="./target/release/indexer"
@@ -101,6 +103,16 @@ split -n "l/$SLICES" -d -a 2 "$WORKDIR/all.txt" "$WORKDIR/slice-"
 
 # `--allow-host` names the subdomains that are separate sites with their own
 # robots.txt; the seed hosts themselves are added to the scope automatically.
+# It sits above drain_slice on purpose: the comment belongs to crawl_slice and
+# stayed here when the drain helper was introduced.
+# Drains the spool left by a slice. Kept as its own function so the overlap
+# mode can call it asynchronously while the next slice is being fetched.
+drain_slice() {
+  local label="$1"
+  echo "=== $(date -u +%H:%M:%S) drain slice ${label} ==="
+  RUST_LOG=info "$INDEXER" --once || echo "indexer exited non-zero after slice ${label}"
+}
+
 crawl_slice() {
   local label="$1" file="$2"
   echo "=== $(date -u +%H:%M:%S) crawl slice ${label}: $(wc -l < "$file") seeds, max ${PAGES_PER_SLICE} pages ==="
@@ -117,19 +129,69 @@ crawl_slice() {
     --max-pages "$PAGES_PER_SLICE" \
     --user-agent "$UA" \
     || echo "crawler exited non-zero for slice ${label}"
-  echo "=== $(date -u +%H:%M:%S) drain slice ${label} ==="
-  RUST_LOG=info "$INDEXER" --once || echo "indexer exited non-zero after slice ${label}"
+
+  # Non-overlap keeps the original, sequential shape: crawl, drain, crawl.
+  # This is the safe default and the mode a cold index should start in.
+  if [ "$OVERLAP_DRAIN" -eq 0 ]; then
+    drain_slice "$label"
+  fi
+}
+
+# Waits for a previously backgrounded drain and reports its status. The file
+# descriptor exists so the parent does not accidentally inherit the drain's
+# stdout and hold the terminal open.
+wait_for_drain() {
+  local pid_file="$1" label="$2"
+  if [ -f "$pid_file" ]; then
+    local pid
+    pid="$(cat "$pid_file")"
+    if kill -0 "$pid" 2>/dev/null; then
+      echo "=== $(date -u +%H:%M:%S) waiting for overlap drain from slice ${label} ==="
+      wait "$pid" || echo "overlap indexer exited non-zero after slice ${label}"
+    fi
+    rm -f "$pid_file"
+  fi
 }
 
 round=0
+last_pid_file=""
 while :; do
   round=$((round + 1))
   if [ "$LOOP" -eq 1 ]; then
     echo "=== $(date -u +%H:%M:%S) round ${round} ==="
   fi
+
   for file in "$WORKDIR"/slice-*; do
-    crawl_slice "$(basename "$file" | sed 's/^slice-//')" "$file"
+    label="$(basename "$file" | sed 's/^slice-//')"
+
+    # Finish any drain left running from the previous slice before this slice
+    # starts. The drain is a bounded local job, so this normally returns
+    # immediately; when it does not, the crawl waits rather than queueing two
+    # index writers, which Tantivy forbids.
+    if [ -n "$last_pid_file" ]; then
+      wait_for_drain "$last_pid_file" "$label"
+      last_pid_file=""
+    fi
+
+    crawl_slice "$label" "$file"
+
+    if [ "$OVERLAP_DRAIN" -eq 1 ]; then
+      # Drains the slice that just finished while the next slice is fetched.
+      # The crawler and indexer touch different directories while running, and
+      # the next drain still waits for this one, so only one index writer is
+      # ever active.
+      drain_slice "$label" &
+      drain_pid=$!
+      last_pid_file="$WORKDIR/drain-${label}.pid"
+      printf "%s\n" "$drain_pid" >"$last_pid_file"
+    fi
   done
+
+  # Never leave a background drain behind when the round ends.
+  if [ -n "$last_pid_file" ]; then
+    wait_for_drain "$last_pid_file" "final"
+    last_pid_file=""
+  fi
 
   echo "=== $(date -u +%H:%M:%S) round ${round} done ==="
   echo "documents in the index:"
